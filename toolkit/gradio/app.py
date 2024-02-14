@@ -5,11 +5,11 @@ import torch
 
 # Load the model and config when the script starts
 config = PeftConfig.from_pretrained("% MODEL_NAME %")
-model = AutoModelForCausalLM.from_pretrained("NousResearch/Llama-2-7b-chat-hf")
+model = AutoModelForCausalLM.from_pretrained("PRETRAINED_MODEL_NAME", config=config)
 model = PeftModel.from_pretrained(model, "% MODEL_NAME %")
 
 # Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained("NousResearch/Llama-2-7b-chat-hf", add_eos_token=True)
+tokenizer = AutoTokenizer.from_pretrained("PRETRAINED_MODEL_NAME", add_eos_token=True)
 
 
 def greet(text):
@@ -17,7 +17,7 @@ def greet(text):
 
     # Use torch.no_grad to disable gradient calculation
     with torch.no_grad():
-        output_tokens = model.generate(**batch, do_sample=True, max_new_tokens=50)
+        output_tokens = model.generate(**batch, do_sample=True, max_new_tokens=20)
 
     return tokenizer.decode(output_tokens[0], skip_special_tokens=True)
 
