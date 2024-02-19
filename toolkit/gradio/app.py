@@ -1,26 +1,35 @@
 import gradio as gr
 from peft import PeftModel, PeftConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch
 
-# Load the model and config when the script starts
-config = PeftConfig.from_pretrained("% MODEL_NAME %")
-model = AutoModelForCausalLM.from_pretrained("PRETRAINED_MODEL_NAME", config=config)
-model = PeftModel.from_pretrained(model, "% MODEL_NAME %")
+# Device configuration (prioritize GPU if available)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model_id = "%MODEL_ID%"
 
-# Load the tokenizer
-tokenizer = AutoTokenizer.from_pretrained("PRETRAINED_MODEL_NAME", add_eos_token=True)
+bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch
+.bfloat16
+        )
 
+# Load models and tokenizer efficiently
+config = PeftConfig.from_pretrained(model_id)
+tokenizer = AutoTokenizer.from_pretrained(config.base_model_name_or_path)
+model = AutoModelForCausalLM.from_pretrained(config.base_model_name_or_path, quantization_config=bnb_config)
+
+# Load the Lora model
+model = PeftModel.from_pretrained(model, model_id)
 
 def greet(text):
-    batch = tokenizer(f"'{text}' ->: ", return_tensors='pt')
-
-    # Use torch.no_grad to disable gradient calculation
-    with torch.no_grad():
-        output_tokens = model.generate(**batch, do_sample=True, max_new_tokens=20)
-
+    with torch.no_grad():  # Disable gradient calculation for inference
+        batch = tokenizer(f'"{text}" ->:', return_tensors='pt')  # Move tensors to device
+        with torch.cuda.amp.autocast():  # Enable mixed-precision if available
+            output_tokens = model.generate(**batch
+, max_new_tokens=15)
     return tokenizer.decode(output_tokens[0], skip_special_tokens=True)
 
-
-iface = gr.Interface(fn=greet, inputs="text", outputs="text")
-iface.launch()
+iface = gr.Interface(fn=greet, inputs="text", outputs="text", title="PEFT Model for Big Brain")
+iface.launch()  # Share directly to Gradio Space
